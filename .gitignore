@@ -1,1 +1,6 @@
+/__pycache__
+/.vscode
 /TheAltoCollection/
+/dataset
+/obstacle-detection/images
+/NoFocusLoss0.1
