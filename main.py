@@ -1,112 +1,113 @@
-import time, numpy as np, torch, mss, cv2, pyautogui, torch.nn as nn
-from termcolor import colored
-from torchvision import transforms, models  
+import time, datetime
+import collections
+import numpy as np
+import torch
+import mss
+import cv2
+import pyautogui
+from torchvision import models
+import torch.nn as nn
 from torch.amp import autocast
-from PIL import Image
 
-# ==== SETTINGS ====   
-def build_model(name, num_classes=2):
-    if name == "resnet18":
-        model = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
-        model.fc = nn.Linear(model.fc.in_features, num_classes)
-    elif name == "mobilenetv3_small":
-        model = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.IMAGENET1K_V1)
-        model.classifier[3] = nn.Linear(model.classifier[3].in_features, num_classes)
-    elif name == "mobilenetv3_large":
-        model = models.mobilenet_v3_large(weights=models.MobileNet_V3_Large_Weights.IMAGENET1K_V1)
-        model.classifier[3] = nn.Linear(model.classifier[3].in_features, num_classes)
-    elif name == "mobilenet_v2":
-        model = models.mobilenet_v2(weights=models.MobileNet_V2_Weights.IMAGENET1K_V1)
-        model.classifier[1] = nn.Linear(model.last_channel, 2)
-    else:
-        raise ValueError(f"Unknown model: {name}")
-    return model
+# ----------------- CONFIG -----------------
+MODEL_PATH = "obstacle-detection/models/v2_28-08.pth"
+THRESH_OBSTACLE = 0.6
+monitor_number = 2
+ROI = (350, 100, 1290, 1040)
+IMG_SIZE = 384
+# ------------------------------------------
 
-model_name = 'mobilenetv3_small'
-MODEL_PATH = "obstacle-detection/models/1756297986.726654.pth"
-THRESH_obstacle = 0.6 # !!!
-COOLDOWN_S  = 0.35
-monitor_number = 1
-
-ROI = (30, 88, 542, 600)
-
-# ==== DEVICE ====
+# device
 device = torch.device("cuda" if torch.cuda.is_available()
                       else ("mps" if torch.backends.mps.is_available() else "cpu"))
 print(f"[INFO] Device: {device}")
 if device.type == "cuda":
     torch.backends.cudnn.benchmark = True
 
-# ==== MODEL ====
-model = build_model(model_name, num_classes=2)
+# model
+model = models.efficientnet_v2_s(weights=models.EfficientNet_V2_S_Weights.IMAGENET1K_V1)
 state = torch.load(MODEL_PATH, map_location=device)
 model.load_state_dict(state)
-model.eval().to(device)
+model.eval()
+model.to(device)
 
-pre = transforms.Compose([
-        transforms.Resize((256, 256)),
-        transforms.ToTensor(),
-        transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
-])
- 
+# if CUDA -> allow half precision for speed
+use_fp16 = (device.type == "cuda")
+if use_fp16:
+    model.half()
+
 softmax = nn.Softmax(dim=1)
 
+# capture
 sct = mss.mss()
 mon = sct.monitors[monitor_number]
-
-y1, x1, y2, x2 = ROI
+x1, y1, x2, y2 = ROI
+w = x2 - x1
+h = y2 - y1
+print(f"[INFO] Capturing monitor: {monitor_number}, ROI size: {w}x{h}")
 
 monitor = {
-    "top": mon["top"] + y1,
-    "left": mon["left"] + x1,
-    "width": x2 - x1,
-    "height": y2 - y1,
+    "top": mon["top"] + 100,
+    "left": mon["left"] + 350,
+    "width": 940,
+    "height": 940,
     "mon": monitor_number,
 }
 
-
-print(f"[INFO] Capturing monitor: {monitor}")
-
 last_obstacle_t = 0.0
+frame_counter = 0
+t0 = time.time()
+fps_history = collections.deque(maxlen=30)
 
 print("[INFO] Running. Press ESC on preview window to quit.")
+
 while True:
+    loop_start = time.time()
 
-    frame = np.array(sct.grab(monitor))
-    frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
-    pil_ready = Image.fromarray(frame)
+    # fast capture -> BGRA ndarray
+    raw = np.array(sct.grab(monitor))
 
-    # preprocess -> tensor on GPU (ensure 1 channel)
-    tensor = pre(pil_ready).unsqueeze(0).to(device, non_blocking=True)  # shape [1,1,H,W]
+    # convert + resize once (BGR -> RGB ordering)
+    bgr = raw[:, :, :3]        # drop alpha
+    rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+    img = cv2.resize(rgb, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_LINEAR)
 
+    tensor = torch.from_numpy(img).permute(2, 0, 1).unsqueeze(0).to(device, non_blocking=True)
+    tensor = tensor.float().div(255.0)
+    if use_fp16:
+        tensor = tensor.half()
+
+    # inference
     with torch.no_grad():
-        with autocast('cuda'):
+        if use_fp16:
+            with autocast('cuda', dtype=torch.float16):
+                logits = model(tensor)
+        else:
             logits = model(tensor)
-            probs = softmax(logits)[0].detach().cpu().numpy()  # [p_obstacle, p_dont]
+        probs = softmax(logits)
+        p_obstacle = float(probs[0, 0].cpu().numpy())
 
-    p_obstacle = float(probs[0])
-
-    
-    # action with cooldown
+    # cooldown & action
     now = time.time()
-    if p_obstacle <= THRESH_obstacle and (now - last_obstacle_t) >= COOLDOWN_S:
-        pyautogui.keyDown("space")
-        pyautogui.keyUp("space")
+    if p_obstacle < THRESH_OBSTACLE:
+        pyautogui.press("space")
         last_obstacle_t = now
-        print(colored(f'Obstacle found! Confidance {p_obstacle:.2f}', 'blue'))    
+        status = ("OBSTACLE", (255, 0, 0))   # red
+        print(f'obstacle! at {datetime.datetime.now().strftime("%H:%M:%S")}, p={p_obstacle:.3f}')
     else:
-        print(colored(f'No obstacle. Confidance {p_obstacle:.2f}', 'green'))
+        status = ("NO OBSTACLE", (0, 255, 0))  # green
 
-    def preview():
-        disp = frame.copy()
-        cv2.rectangle(disp, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        label = f"confidance: {p_obstacle:.2f}"
-        color = (0,0,255) if last_obstacle_t == now else (0,255,0)
-        cv2.putText(disp, label, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
-        cv2.imshow("Screen", disp)
-    preview()
+    preview = cv2.resize(bgr, (w // 2, h // 2))   # smaller preview window
+    label = f"{status[0]}  p={p_obstacle:.2f}  fps={np.mean(fps_history) if fps_history else 0:.1f}"
+    cv2.putText(preview, label, (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, status[1], 2)
+    cv2.imshow("Game (cropped preview)", preview)
+
+    # fps calc
+    loop_dt = time.time() - loop_start
+    fps_history.append(1.0 / loop_dt if loop_dt > 0 else 0.0)
+
     # exit
-    if cv2.waitKey(1) == 27:  # ESC
+    if cv2.waitKey(1) == 27:
         break
 
 cv2.destroyAllWindows()

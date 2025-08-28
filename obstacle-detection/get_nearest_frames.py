@@ -3,7 +3,7 @@ import os
 path = f"obstacle-detection/images"
 filelist_dict = { ind: name for (ind,name) in enumerate([files for files in os.listdir(f"{path}/obstacle")]) }
 directory = f"{path}/obstacle"
-frames = 3
+frames = 2
 # num_files = count_files_in_directory(directory)
 
 

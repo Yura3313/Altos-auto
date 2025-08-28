@@ -4,7 +4,7 @@ from torchvision import datasets, transforms, models
 from torch.amp import GradScaler, autocast
 from sklearn.metrics import f1_score
 
-default_out = f"obstacle-detection/models/{time.time()}.pth"
+
 
 def parse_args():
     ap = argparse.ArgumentParser()
@@ -12,31 +12,17 @@ def parse_args():
                     help="folder with subfolders obstacle/ and no_obstacle/")
     ap.add_argument("--epochs", type=int, default=12)
     ap.add_argument("--batch_size", type=int, default=32)
-    ap.add_argument("--lr", type=float, default=0.0002)
-    ap.add_argument("--img", type=int, default=[256, 256])
+    ap.add_argument("--lr", type=float, default=0.001)
+    ap.add_argument("--img", type=int, default=[384, 384])
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--val_split", type=float, default=0.2)
     ap.add_argument("--out", type=str, default=default_out)
-    ap.add_argument("--model", type=str, default="mobilenetv3_small", choices=["resnet18", "mobilenetv3_small", "mobilenetv3_large"],
+    ap.add_argument("--model", type=str, default="efficientnet_v2_s", choices=["resnet18", "mobilenetv3_small", 'efficientnet_v2_s'],
                     help="Choose backbone model.")
     return ap.parse_args()
 
-def base_model(name, num_classes=2):
-    if name == "resnet18":
-        model = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
-        model.fc = nn.Linear(model.fc.in_features, num_classes)
-    elif name == "mobilenetv3_small":
-        model = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.IMAGENET1K_V1)
-        model.classifier[3] = nn.Linear(model.classifier[3].in_features, num_classes)
-    elif name == "mobilenetv3_large":
-        model = models.mobilenet_v3_large(weights=models.MobileNet_V3_Large_Weights.IMAGENET1K_V1)
-        model.classifier[3] = nn.Linear(model.classifier[3].in_features, num_classes)
-    elif name == "efficientnet_b0":
-        model = models.efficientnet_b0(weights=models.EfficientNet_B0_Weights.IMAGENET1K_V1)
-        model.classifier[1] = nn.Linear(model.classifier[1].in_features, num_classes)
-    else:
-        raise ValueError(f"Unknown model: {name}")
-    return model
+model = models.efficientnet_v2_s(weights=models.EfficientNet_V2_S_Weights.IMAGENET1K_V1)
+default_out = f"obstacle-detection/models/v2_{time.time()}.pth"
 
 def train_one_epoch(model, loader, optimizer, scaler, device, epoch, print_freq=10):
     model.train()
@@ -101,8 +87,7 @@ def main():
     dl_val = DataLoader(ds_val, batch_size=args.batch_size, shuffle=False,
                         num_workers=args.workers, pin_memory=True, persistent_workers=args.workers > 0)
     print(f"[INFO] DataLoaders: {len(dl_train)} train batches, {len(dl_val)} val batches")
-
-    model = base_model(args.model, num_classes=2)
+    # --- Model, optimizer, scaler
     model.to(device)
     print(f"[INFO] Using model: {args.model}")
 

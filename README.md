@@ -31,14 +31,7 @@ pip install -r requirements.txt
 
 ### **Step 3: Game Configuration**
 
-The bot requires the game window to be set to a specific size and position.
-
-1.  Create a shortcut for Alto's Odyssey on your desktop.
-2.  Right-click the shortcut and select **Properties**.
-3.  In the `Target` field, append the following text to the end:
-    `-screen-fullscreen 0 -screen-width 600 -screen-height 512`
-4.  Launch the game using this shortcut.
-5.  **Move the 600x512 game window to the top-right corner of your screen.** The bot's accuracy depends on this exact placement.
+The bot requires the game to be opened fullscreen on the main monitor.
 
 ### **Step 4: Running the Bot**
 
@@ -48,7 +41,7 @@ Open a terminal, navigate to the project directory, and execute the main script.
 python main.py
 ```
 
-To stop the bot, press `Ctrl+C` in the terminal.
+To stop the bot, press `Esc` while focused on the preview window.
 
 -----
 
@@ -72,4 +65,4 @@ Key parameters, such as jump sensitivity and the screen region for detection, ca
 
 ### **Contributing**
 
-This is an early-stage project, and contributions are welcome. If you have ideas for improvements, open an issue. If you would like to fix a bug, feel free to submit a pull request - though the code is very messy, so good luck. If you have nothing to do you can record your gameplay using the image collector and train a new model :).
+This is an early-stage project, and contributions are welcome. If you have ideas for improvements, open an issue. If you would like to fix a bug, feel free to submit a pull request - though the code is very messy, so good luck. If you have nothing to do you can record your gameplay using the gameplay recorder and train a new model :).
