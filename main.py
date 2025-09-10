@@ -7,7 +7,7 @@ import cv2
 import pyautogui
 from torchvision import models
 import torch.nn as nn
-from torch.amp import autocast
+from torch.amp.autocast_mode import autocast
 
 # ----------------- CONFIG -----------------
 MODEL_PATH = "obstacle-detection/models/v2_28-08.pth"
@@ -18,8 +18,7 @@ IMG_SIZE = 384
 # ------------------------------------------
 
 # device
-device = torch.device("cuda" if torch.cuda.is_available()
-                      else ("mps" if torch.backends.mps.is_available() else "cpu"))
+device = torch.device("cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))
 print(f"[INFO] Device: {device}")
 if device.type == "cuda":
     torch.backends.cudnn.benchmark = True
@@ -61,16 +60,26 @@ fps_history = collections.deque(maxlen=30)
 
 print("[INFO] Running. Press ESC on preview window to quit.")
 
+stats_frame = {
+    'top': mon['top'] + 30,
+    'left': mon['left'] + 1630,
+    'width': 270,
+    'height': 140,
+    'mon': monitor_number
+}
+
+playing = False
+frame = 2253
+
 while True:
     loop_start = time.time()
 
-    # fast capture -> BGRA ndarray
+    # fast capture -> RGB ndarray
     raw = np.array(sct.grab(monitor))
+    rgb = cv2.cvtColor(raw[:, :, :3], cv2.COLOR_BGR2RGB)
+    
 
-    # convert + resize once (BGR -> RGB ordering)
-    bgr = raw[:, :, :3]        # drop alpha
-    rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-    img = cv2.resize(rgb, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_LINEAR)
+    img = cv2.resize(rgb, (IMG_SIZE, IMG_SIZE))
 
     tensor = torch.from_numpy(img).permute(2, 0, 1).unsqueeze(0).to(device, non_blocking=True)
     tensor = tensor.float().div(255.0)
@@ -92,21 +101,36 @@ while True:
     if p_obstacle < THRESH_OBSTACLE:
         pyautogui.press("space")
         last_obstacle_t = now
-        status = ("OBSTACLE", (255, 0, 0))   # red
+        status = ("OBSTACLE", (255, 0, 0))
         print(f'obstacle! at {datetime.datetime.now().strftime("%H:%M:%S")}, p={p_obstacle:.3f}')
     else:
-        status = ("NO OBSTACLE", (0, 255, 0))  # green
+        status = ("NO OBSTACLE", (0, 255, 0))
 
-    preview = cv2.resize(bgr, (w // 2, h // 2))   # smaller preview window
-    label = f"{status[0]}  p={p_obstacle:.2f}  fps={np.mean(fps_history) if fps_history else 0:.1f}"
-    cv2.putText(preview, label, (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, status[1], 2)
-    cv2.imshow("Game (cropped preview)", preview)
+    preview = raw
+    label = f"{status[0]}  p={p_obstacle:.2f}  fps={np.mean(fps_history) if fps_history else 0:.1f} state={'in game' if playing else 'not in game'}"
+    cv2.putText(raw, label, (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, status[1], 2)
+    cv2.imshow("Game (cropped preview)", raw)
 
     # fps calc
     loop_dt = time.time() - loop_start
     fps_history.append(1.0 / loop_dt if loop_dt > 0 else 0.0)
 
-    # exit
+    # state detection
+    if frame_counter % 30 == 0:
+        stats_img = np.array(sct.grab(stats_frame))
+        m1 = stats_img[39, 215]
+        m2 = stats_img[51, 256]
+        if m1[0] == m2[0] and m1[1] == m2[1] and m1[2] == m2[2]:
+            playing = True
+        else:
+            playing = False
+            time.sleep(1)
+            pyautogui.press("space")
+            time.sleep(1)
+            pyautogui.press("space")
+
+
+    frame_counter += 1
     if cv2.waitKey(1) == 27:
         break
 
