@@ -3,14 +3,12 @@ from torch.utils.data import DataLoader, random_split
 from torchvision import datasets, transforms, models
 from torch.amp.grad_scaler import GradScaler
 from torch.amp.autocast_mode import autocast
-from sklearn.metrics import f1_score
 
 start_time = time.time()
 
 def parse_args():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--data", type=str, default="obstacle-detection/images",
-                    help="folder with subfolders obstacle/ and no_obstacle/")
+    ap.add_argument("--data", type=str, default="obstacle-detection/images", help="folder with subfolders obstacle/ and no_obstacle/")
     ap.add_argument("--epochs", type=int, default=5)
     ap.add_argument("--batch_size", type=int, default=16)
     ap.add_argument("--lr", type=float, default=0.001)
@@ -56,18 +54,15 @@ def train_one_epoch(model, loader, optimizer, scaler, device, epoch, num_classes
 
         running_loss += loss.item()
 
-        # update confusion matrix (move minimal info to CPU)
         pred_labels = preds.argmax(dim=1).cpu().to(torch.long)
         true_labels = lbls.cpu().to(torch.long)
 
-        # quick sanity checks (helpful while debugging)
         if pred_labels.max().item() >= num_classes or true_labels.max().item() >= num_classes:
             print(f"[WARN] label/pred out of range: num_classes={num_classes}, pred_max={pred_labels.max().item()}, true_max={true_labels.max().item()}")
             # fall back to safe per-sample accumulation
             for t, p in zip(true_labels.tolist(), pred_labels.tolist()):
                 if 0 <= t < num_classes and 0 <= p < num_classes:
                     confusion[t, p] += 1
-            # continue to next batch
         else:
             # flattened index MUST be actual * C + predicted
             idx = true_labels * num_classes + pred_labels
