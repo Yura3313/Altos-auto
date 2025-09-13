@@ -9,8 +9,8 @@ start_time = time.time()
 def parse_args():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", type=str, default="obstacle-detection/images", help="folder with subfolders obstacle/ and no_obstacle/")
-    ap.add_argument("--epochs", type=int, default=5)
-    ap.add_argument("--batch_size", type=int, default=16)
+    ap.add_argument("--epochs", type=int, default=12)
+    ap.add_argument("--batch_size", type=int, default=32)
     ap.add_argument("--lr", type=float, default=0.001)
     ap.add_argument("--img", type=int, default=[384, 384])
     ap.add_argument("--workers", type=int, default=8)
@@ -144,8 +144,6 @@ def main():
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scaler = GradScaler('cuda')
-
-    # compute num_classes from dataset
     num_classes = len(ds_full.classes)
 
     best_f1 = 0.0

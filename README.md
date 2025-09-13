@@ -4,6 +4,8 @@ Altos Auto is an bot designed to automate gameplay in **Alto's Odyssey**. Using 
 
 This project is currently in development, and its performance __will__ be inconsistent.
 
+<video controls autoplay src="recordings/gameplay.mp4" title="Title"></video>
+
 -----
 
 ## Core Features
