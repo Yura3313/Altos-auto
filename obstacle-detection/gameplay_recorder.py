@@ -5,47 +5,48 @@ import keyboard
 from time import sleep, time
 from termcolor import colored
 
-i = 0
+
 space_pressed = False
 last_press_time = 0.0
-COOLDOWN_S = 0.3
+cooldown_i = 3
 fps = 20
+ROI = (230, 100, 1310, 1060)
 
 now = time()
+x1, y1, x2, y2 = ROI
+w = x2 - x1
+h = y2 - y1
 
-# This runs asynchronously and sets a flag
-def on_space(e):
-    global space_pressed
-    space_pressed = True
-
-keyboard.on_press_key("space", on_space)
 
 with mss.mss() as sct:
+    i = 0
     monitor_number = 2
     mon = sct.monitors[monitor_number]
-
+    print(f"[INFO] Capturing monitor: {monitor_number}, ROI size: {w}x{h}")
     monitor = {
-        "top": mon["top"] + 100,
-        "left": mon["left"] + 350,
-        "width": 940,
-        "height": 940,
-        "mon": monitor_number,
-    }
+    "top": mon["top"] + y1,
+    "left": mon["left"] + x1,
+    "width": w,
+    "height": h,
+    "mon": monitor_number}       
+
+
 
     while True:
         now = time()
 
         sct_img = np.array(sct.grab(monitor))
+        resized = cv2.resize(sct_img, (384, 384))
 
-        cv2.imshow("Preview", sct_img)
+        cv2.imshow("Preview", resized)
 
-        if space_pressed and (now - last_press_time) >= COOLDOWN_S:
-            cv2.imwrite(f'obstacle-detection/images/obstacle/{i}.png', sct_img)
+        if keyboard.is_pressed('space') or keyboard.is_pressed('c'):
+            cv2.imwrite(f'obstacle-detection/images/obstacle/{i}.png', resized)
             obstacle = True
             space_pressed = False
-            last_press_time = now
+            last_press_time = i
         else:
-            cv2.imwrite(f'obstacle-detection/images/no_obstacle/{i}.png', sct_img)
+            cv2.imwrite(f'obstacle-detection/images/no_obstacle/{i}.png', resized)
             obstacle = False
 
         if cv2.waitKey(1) == 27:

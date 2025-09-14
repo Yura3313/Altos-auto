@@ -11,11 +11,11 @@ from torch.amp.autocast_mode import autocast
 
 
 # ----------------- CONFIG -----------------
-model_name = "v2.1_13-09"
+model_name = "v2.1_15-09"
 MODEL_PATH = f"obstacle-detection/models/{model_name}.pth"
 THRESH_OBSTACLE = 0.6
 monitor_number = 2
-ROI = (350, 100, 1290, 1040)
+ROI = (350, 100, 1310, 1060)
 IMG_SIZE = 384
 # ------------------------------------------
 
@@ -30,6 +30,7 @@ model.eval()
 model.to(device)
 
 softmax = nn.Softmax(dim=1)
+hold_space = False
 last_obstacle_t = 0.0
 frame_counter = 0
 status_check_freq = 5
@@ -51,10 +52,10 @@ if device.type == "cuda":
     use_fp16 = True
 
 monitor = {
-    "top": mon["top"] + 100,
-    "left": mon["left"] + 350,
-    "width": 940,
-    "height": 940,
+    "top": mon["top"] + y1,
+    "left": mon["left"] + x1,
+    "width": w,
+    "height": h,
     "mon": monitor_number,
 }
 
@@ -90,15 +91,20 @@ while True:
     # cooldown & action
     now = time.time()
     if p_obstacle < THRESH_OBSTACLE:
-        pyautogui.press("space")
-        last_obstacle_t = now
-        status = ("OBSTACLE" , (0, 0, 255))
+        hold_space = True
+        pyautogui.keyDown("space")
+        status = ("holding space" , (0, 0, 255))
         print(f'[INFO] Obstacle! at {datetime.datetime.now().strftime("%H:%M:%S")}, p={p_obstacle:.3f}')
+    elif hold_space:
+        pyautogui.keyUp("space")
+        hold_space = False
+        status = ("clear" , (0, 255, 0))
     else:
-        status = ("NO OBSTACLE", (0, 255, 255))
+        status = ("clear" , (0, 255, 0))
+            
 
     label = f"{status[0]}  p={p_obstacle:.2f}  fps={fps if fps_history else 0:.1f} "
-    label2 = f'state={'in game' if playing else 'not in game'}  frame={frame_counter}'
+    label2 = f'state={"in game" if playing else "not in game"}  frame={frame_counter}'
     cv2.putText(raw, label, (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, status[1], 2)
     cv2.putText(raw, label2, (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
     cv2.imshow("Game (cropped preview)", raw)
@@ -123,8 +129,8 @@ while True:
             scheduled_actions.append((now + 2, "space"))
             scheduled_actions.append((now + 3, "space"))
             if len(fps_history) > 5:
-                status_check_freq = int(fps) * 5
-                print(f'[INFO] adjusting status_check_freq to {status_check_freq}, fps={fps:.1f}')
+                status_check_freq = int(fps) * 3
+                print(f'[INFO] Adjusting status_check_freq to {status_check_freq}, fps={fps:.1f}')
             playing = False
 
     if scheduled_actions and now >= scheduled_actions[0][0]:

@@ -9,9 +9,9 @@ start_time = time.time()
 def parse_args():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", type=str, default="obstacle-detection/images", help="folder with subfolders obstacle/ and no_obstacle/")
-    ap.add_argument("--epochs", type=int, default=12)
+    ap.add_argument("--epochs", type=int, default=50)
     ap.add_argument("--batch_size", type=int, default=32)
-    ap.add_argument("--lr", type=float, default=0.001)
+    ap.add_argument("--lr", type=float, default=0.0001)
     ap.add_argument("--img", type=int, default=[384, 384])
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--val_split", type=float, default=0.2)
@@ -108,11 +108,9 @@ def main():
         torch.backends.cudnn.benchmark = True
 
     train_tf = transforms.Compose([
-        transforms.Resize((args.img[0], args.img[1])),
         transforms.ToTensor()
     ])
     val_tf = transforms.Compose([
-        transforms.Resize((args.img[0], args.img[1])),
         transforms.ToTensor()
     ])
 
