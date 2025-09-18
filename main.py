@@ -1,4 +1,5 @@
-import time, datetime
+import time
+import datetime
 import collections
 import numpy as np
 import torch
@@ -11,10 +12,10 @@ from torch.amp.autocast_mode import autocast
 
 
 # ----------------- CONFIG -----------------
-model_name = "v2.1_15-09"
-MODEL_PATH = f"obstacle-detection/models/{model_name}.pth"
-THRESH_OBSTACLE = 0.6
-monitor_number = 2
+MODEL_NAME = "v2.1_15-09"
+MODEL_PATH = f"obstacle-detection/models/{MODEL_NAME}.pth"
+THRESH_OBSTACLE = 0.4
+MONITOR_NUM = 2 
 ROI = (350, 100, 1310, 1060)
 IMG_SIZE = 384
 # ------------------------------------------
@@ -39,14 +40,14 @@ playing = True
 scheduled_actions = []
 t0 = time.time()
 fps_history = collections.deque(maxlen=30)
-use_fp16 = False
+use_fp16 = True
 
 sct = mss.mss()
-mon = sct.monitors[monitor_number]
+mon = sct.monitors[MONITOR_NUM]
 x1, y1, x2, y2 = ROI
 w = x2 - x1
 h = y2 - y1
-print(f"[INFO] Capturing monitor: {monitor_number}, ROI size: {w}x{h}")
+print(f"[INFO] Capturing monitor: {MONITOR_NUM}, ROI size: {w}x{h}")
 
 if device.type == "cuda":
     use_fp16 = True
@@ -56,7 +57,7 @@ monitor = {
     "left": mon["left"] + x1,
     "width": w,
     "height": h,
-    "mon": monitor_number,
+    "mon": MONITOR_NUM,
 }
 
 stats_frame = {
@@ -64,11 +65,11 @@ stats_frame = {
     'left': mon['left'] + 1630,
     'width': 270,
     'height': 140,
-    'mon': monitor_number
+    'mon': MONITOR_NUM
 }
 
 
-print(f"[INFO] Starting using {model_name}. Press ESC on preview window to quit.")
+print(f"[INFO] Starting using {MODEL_NAME}. Press ESC on preview window to quit.")
 while True:
     loop_start = time.time()
 
