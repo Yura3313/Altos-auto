@@ -4,16 +4,16 @@ Altos Auto is an bot designed to automate gameplay in **Alto's Odyssey**. Using 
 
 This project is currently in development, and its performance __will__ be inconsistent.
 
-https://github.com/user-attachments/assets/4d238943-b3ba-4544-b124-e04de3afe91f
+Demo:
+https://www.youtube.com/watch?v=6sI2LMU73eY
 
 -----
 
 ## Core Features
 
-  * **Automated Gameplay:** Plays the game to assist with coin collection.
-  * **Obstacle Detection:** Uses image processing to identify rocks and ramps.
+  * **Automated Gameplay:** Plays the game to assist with coin collection and leveling up.
   * **GPU accelerated:** Neural net go brrr
-  * **Automated Actions:** Executes jumps and backflips in response to obstacles.
+  * **Automated Actions:** Executes jumps and **backflips** in response to visuals.
 
 -----
 
